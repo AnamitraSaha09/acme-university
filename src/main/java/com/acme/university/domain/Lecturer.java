@@ -123,7 +123,7 @@ public class Lecturer {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Lecturer)) return false;
-        return (id.equals(((Lecturer) o).id) || lecturerId.equals(((Lecturer) o).getLecturerId()));
+        return lecturerId.equals(((Lecturer) o).getLecturerId());
     }
 
     @Override

@@ -19,15 +19,31 @@ public class RateLimitingConfig {
         return capacity;
     }
 
+    public void setCapacity(long capacity) {
+        this.capacity = capacity;
+    }
+
     public Duration getRefillInterval() {
         return refillInterval;
+    }
+
+    public void setRefillInterval(Duration refillInterval) {
+        this.refillInterval = refillInterval;
     }
 
     public long getMaxClients() {
         return maxClients;
     }
 
+    public void setMaxClients(long maxClients) {
+        this.maxClients = maxClients;
+    }
+
     public Duration getClientTtl() {
         return clientTtl;
+    }
+
+    public void setClientTtl(Duration clientTtl) {
+        this.clientTtl = clientTtl;
     }
 }

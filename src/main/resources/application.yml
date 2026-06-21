@@ -20,6 +20,6 @@ server:
 
 rate-limit:
   capacity: 50
-  refill-period: 1s
+  refill-interval: 1s
   max-clients: 100000
   client-ttl: 10m
