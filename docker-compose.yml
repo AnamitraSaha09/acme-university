@@ -1,0 +1,32 @@
+# Local runtime for the ACME University service.
+#
+# `docker compose up` starts PostgreSQL (and, once you complete the Dockerfile,
+# the application). Integration tests do NOT use this file — they run against an
+# in-memory H2 database.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: acme
+      POSTGRES_USER: acme
+      POSTGRES_PASSWORD: acme
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acme -d acme"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATASOURCE_URL: jdbc:postgresql://db:5432/acme
+      DATASOURCE_USERNAME: acme
+      DATASOURCE_PASSWORD: acme
+    ports:
+      - "8080:8080"

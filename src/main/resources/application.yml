@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: acme-university
+  datasource:
+    # Defaults match docker-compose.yml. Override via environment variables.
+    url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/acme}
+    username: ${DATASOURCE_USERNAME:acme}
+    password: ${DATASOURCE_PASSWORD:acme}
+  jpa:
+    hibernate:
+      # using Flyway
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+
+rate-limit:
+  capacity: 50
+  refill-period: 1s
+  max-clients: 100000
+  client-ttl: 10m
