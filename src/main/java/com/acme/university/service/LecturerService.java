@@ -33,7 +33,8 @@ public class LecturerService {
     @Transactional
     public LecturerResponse createLecturer(CreateLecturerRequest request) {
         if(lecturerRepository.existsByLecturerId(request.lecturerId())) {
-            throw new ResourceAlreadyExistsException("Lecturer with id " + request.lecturerId() + " already exists");
+            log.error("Lecturer with lecturerId {} already exists.", request.lecturerId());
+            throw new ResourceAlreadyExistsException("Lecturer with id " + request.lecturerId() + " already exists.");
         }
         log.info("No lecturer found with lecturerId {}", request.lecturerId());
         Lecturer lecturer = lecturerRepository.save(new Lecturer(request.lecturerId(), request.name(), request.surname()));
@@ -49,8 +50,8 @@ public class LecturerService {
     @Transactional(readOnly = true)
     public LecturerResponse getLecturer(String lecturerId) {
         Lecturer lecturer = lecturerRepository.findByLecturerId(lecturerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Lecturer with id " + lecturerId + " not found"));
-        log.info("Student found with studentId {}", lecturerId);
+                .orElseThrow(() -> new ResourceNotFoundException("Lecturer with id " + lecturerId + " not found."));
+        log.info("Lecturer found with studentId {}.", lecturerId);
         return LecturerResponse.fromLecturer(lecturer);
     }
 }

@@ -58,6 +58,7 @@ public class StudentService {
         try {
             lecturer.assignUniqueStudent(student);
             lecturerRepository.saveAndFlush(lecturer);
+            log.info("Created student with studentId {}", request.studentId());
             log.info("Lecturer {} assigned to student {}", lecturer.getLecturerId(), student.getStudentId());
         } catch (DataIntegrityViolationException e) {
             throw new ResourceAlreadyExistsException("Student with id " + request.studentId()
