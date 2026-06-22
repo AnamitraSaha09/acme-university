@@ -81,6 +81,12 @@ second per client). Exhausted clients get `429 Too Many Requests` with a
 `Retry-After` header, successful responses carry `X-Rate-Limit-Remaining`. The
 Caffeine cache (`rate-limit.max-clients`, `rate-limit.client-ttl`) is used so a flood of distinct
 IPs cannot grow memory without limit.
+Throttling is keyed on the client IP (the first hop in X-Forwarded-For). This was chosen over the 
+two alternatives deliberately. Per‑authenticated‑client keying isn't available here since the API has
+no authentication or API‑key layer. Per‑controller/endpoint keying protects a single route but not 
+the shared resource we actually care about and a caller could still exhaust it by spreading load 
+across endpoints. IP keying is therefore the simplest control that directly serves the 
+resiliency goal (shield the DB from a single abusive source)
 
 **Transactions.** Service methods are `@Transactional` (read-only for gets), so
 each operation is atomic and lazy associations are initialised within the transaction.

@@ -1,5 +1,6 @@
 package com.acme.university.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bucket;
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -25,16 +27,22 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class RateLimitingInterceptor implements HandlerInterceptor {
 
+    private static final String HEADER_RATE_LIMIT_REMAINING = "X-RateLimit-Remaining";
+    private static final String HEADER_FORWARDED_FOR = "X-Forwarded-For";
+
     private final Cache<String, Bucket> buckets;
     private final RateLimitingConfig config;
+    private final ObjectMapper objectMapper;
+
     private static final Logger log = LoggerFactory.getLogger(RateLimitingInterceptor.class);
 
-    public RateLimitingInterceptor(RateLimitingConfig config) {
+    public RateLimitingInterceptor(RateLimitingConfig config, ObjectMapper objectMapper) {
         this.buckets = Caffeine.newBuilder()
                 .maximumSize(config.getMaxClients())
                 .expireAfterAccess(config.getClientTtl())
                 .build();
         this.config = config;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -47,23 +55,31 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
 
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         if (probe.isConsumed()) {
-            response.addHeader("X-Rate-Limit-Remaining", Long.toString(probe.getRemainingTokens()));
+            response.addHeader(HEADER_RATE_LIMIT_REMAINING, Long.toString(probe.getRemainingTokens()));
             return true;
         }
 
         log.warn("Rate limit exceeded for client: {}", clientKey);
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
         long waitForRefillSeconds = TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "Rate limit exceeded. Retry after " +waitForRefillSeconds +" seconds."
+        );
+        problem.setProperty("retry after", waitForRefillSeconds);
+
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.addHeader(HttpHeaders.RETRY_AFTER, Long.toString(waitForRefillSeconds));
-        writeBody(response, waitForRefillSeconds);
+
+        writeBody(response, problem);
 
         return false;
     }
 
     private String findClientKey(HttpServletRequest request) {
-        String forwardedHost = request.getHeader("X-Forwarded-For");
+        String forwardedHost = request.getHeader(HEADER_FORWARDED_FOR);
         if (forwardedHost == null || forwardedHost.isBlank()) {
             return request.getRemoteAddr();
         }
@@ -77,12 +93,9 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
         ).build();
     }
 
-    private void writeBody(HttpServletResponse response, long retryAfterSeconds) {
-        String body = "{\"status\":429,\"error\":\"Too Many Requests\","
-                + "\"message\":\"Rate limit exceeded. Retry after " + retryAfterSeconds
-                + " second(s).\"}";
+    private void writeBody(HttpServletResponse response, ProblemDetail problem) {
         try {
-            response.getWriter().write(body);
+            objectMapper.writeValue(response.getWriter(), problem);
         } catch (IOException ignored) {
             // Response already persisted.
         }

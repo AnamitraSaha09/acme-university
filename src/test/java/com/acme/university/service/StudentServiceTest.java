@@ -40,7 +40,6 @@ public class StudentServiceTest {
     void addStudent_whenNew() {
         Lecturer lecturer = new Lecturer("L1", "NameL1", "SurnameL1");
         when(lecturerRepository.findByLecturerId("L1")).thenReturn(Optional.of(lecturer));
-        when(studentRepository.findByStudentId("S1")).thenReturn(Optional.empty());
         when(studentRepository.existsByStudentId("S1")).thenReturn(false);
 
         StudentResponse response = studentService.addStudentToLecturer(
@@ -49,9 +48,9 @@ public class StudentServiceTest {
         assertThat(response.studentId()).isEqualTo("S1");
         assertThat(response.lecturers()).hasSize(1);
         assertThat(response.lecturers().getFirst().lecturerId()).isEqualTo("L1");
-        // should be persisted via JPA
+        
         verify(studentRepository, never()).save(any(Student.class));
-        verify(lecturerRepository).save(lecturer);
+        verify(lecturerRepository).saveAndFlush(lecturer);
     }
 
     @Test
@@ -68,7 +67,7 @@ public class StudentServiceTest {
         assertThat(response.studentId()).isEqualTo("S1");
         assertThat(response.lecturers()).hasSize(1);
         verify(studentRepository, never()).save(any());
-        verify(lecturerRepository).save(lecturer);
+        verify(lecturerRepository).saveAndFlush(lecturer);
     }
 
     @Test
