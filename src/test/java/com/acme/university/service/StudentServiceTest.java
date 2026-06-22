@@ -5,8 +5,8 @@ import com.acme.university.domain.Student;
 import com.acme.university.exception.ResourceNotFoundException;
 import com.acme.university.repository.LecturerRepository;
 import com.acme.university.repository.StudentRepository;
-import com.acme.university.web.dto.CreateStudentRequest;
-import com.acme.university.web.dto.StudentResponse;
+import com.acme.university.web.v1.dto.CreateStudentRequest;
+import com.acme.university.web.v1.dto.StudentResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,6 +41,7 @@ public class StudentServiceTest {
         Lecturer lecturer = new Lecturer("L1", "NameL1", "SurnameL1");
         when(lecturerRepository.findByLecturerId("L1")).thenReturn(Optional.of(lecturer));
         when(studentRepository.findByStudentId("S1")).thenReturn(Optional.empty());
+        when(studentRepository.existsByStudentId("S1")).thenReturn(false);
 
         StudentResponse response = studentService.addStudentToLecturer(
                 "L1", new CreateStudentRequest("S1", "NameS1", "SurnameS1"));
@@ -59,6 +60,7 @@ public class StudentServiceTest {
         Student existing = new Student("S1", "NameS1", "SurnameS1");
         when(lecturerRepository.findByLecturerId("L1")).thenReturn(Optional.of(lecturer));
         when(studentRepository.findByStudentId("S1")).thenReturn(Optional.of(existing));
+        when(studentRepository.existsByStudentId("S1")).thenReturn(true);
 
         StudentResponse response = studentService.addStudentToLecturer(
                 "L1", new CreateStudentRequest("S1", "NameS1", "SurnameS1"));

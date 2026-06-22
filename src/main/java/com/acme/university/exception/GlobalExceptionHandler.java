@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,12 +15,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * Translates application exceptions into JSON HTTP responses.
- *
- * <p>This provides a minimal, working baseline. Feel free to enrich the error
- * payloads (error codes, field-level details, etc.).
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
@@ -30,10 +31,6 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
-    // (Validation requirement): handle MethodArgumentNotValidException
-    //       (thrown when @Valid fails) and return HTTP 400 with the offending
-    //       field names and messages. Optionally handle other framework
-    //       exceptions you care about.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleFieldDataValidation(MethodArgumentNotValidException ex) {
         Map<String, Object> errors = new HashMap<>();
@@ -45,14 +42,22 @@ public class GlobalExceptionHandler {
 
     /**
      * Handles exceptions related to threads writing the same information
-     * @param ex
-     * @return
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        return error(HttpStatus.CONFLICT, ex.getMessage());
+        return error(HttpStatus.CONFLICT, "The resource already exists or violates a uniqueness constraint.");
     }
 
+    @ExceptionHandler(DataMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleDataMismatch(DataMismatchException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleException(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error : " + ex.getMessage());
+    }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
         Map<String, Object> body = Map.of(

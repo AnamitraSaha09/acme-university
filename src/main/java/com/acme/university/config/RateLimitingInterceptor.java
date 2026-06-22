@@ -6,6 +6,9 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,28 +16,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Resiliency requirement: protect the database from excessive requests.
- *
- * <p>Implemented request throttling here using an open-source library of
- * your choice.
- * <ul>
- *   <li>Add the dependency in {@code pom.xml} (a placeholder is noted there).</li>
- *   <li>Decide the limiting key (global, per-client-IP, per-endpoint, ...).</li>
- *   <li>When the limit is exceeded, short-circuit the request: set the
- *       response status to {@code 429 Too Many Requests} and return
- *       {@code false}.</li>
- * </ul>
- * This interceptor is registered in {@link WebConfig}.
+ * Protect the database from excessive requests.
+ * Throttling based on IP. Also accounting for VPN router hops
  */
 @Component
 public class RateLimitingInterceptor implements HandlerInterceptor {
 
     private final Cache<String, Bucket> buckets;
     private final RateLimitingConfig config;
+    private static final Logger log = LoggerFactory.getLogger(RateLimitingInterceptor.class);
 
     public RateLimitingInterceptor(RateLimitingConfig config) {
         this.buckets = Caffeine.newBuilder()
@@ -45,13 +38,12 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest request,
-                             HttpServletResponse response,
-                             Object handler) {
-        // Consults the rate limiter; return false (and set HTTP 429) when
-        //       the caller has exceeded their allowance. Currently a no-op.
+    public boolean preHandle(@NonNull HttpServletRequest request,
+                             @NonNull HttpServletResponse response,
+                             @NonNull Object handler) {
 
-        Bucket bucket = buckets.get(findClientKey(request), key -> newBucket());
+        String clientKey = findClientKey(request);
+        Bucket bucket = buckets.get(clientKey, key -> newBucket());
 
         ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
         if (probe.isConsumed()) {
@@ -59,6 +51,7 @@ public class RateLimitingInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        log.warn("Rate limit exceeded for client: {}", clientKey);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 

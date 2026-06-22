@@ -1,4 +1,4 @@
-package com.acme.university.web.dto;
+package com.acme.university.web.v1.dto;
 
 import com.acme.university.domain.Student;
 

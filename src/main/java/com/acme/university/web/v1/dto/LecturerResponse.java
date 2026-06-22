@@ -1,4 +1,4 @@
-package com.acme.university.web.dto;
+package com.acme.university.web.v1.dto;
 
 import com.acme.university.domain.Lecturer;
 
@@ -14,7 +14,9 @@ public record LecturerResponse(
         String surname,
         List<AssignedStudent> students) {
 
-    /** Minimal view of a student assigned to the lecturer. */
+    /**
+     * Minimal view of a student assigned to the lecturer.
+     */
     public record AssignedStudent(
             String studentId,
             String name,
