@@ -2,6 +2,8 @@ package com.acme.university.service;
 
 import com.acme.university.domain.Lecturer;
 import com.acme.university.domain.Student;
+import com.acme.university.exception.DataMismatchException;
+import com.acme.university.exception.ResourceAlreadyExistsException;
 import com.acme.university.exception.ResourceNotFoundException;
 import com.acme.university.repository.LecturerRepository;
 import com.acme.university.repository.StudentRepository;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
@@ -36,35 +39,41 @@ public class StudentServiceTest {
     @InjectMocks
     private StudentService studentService;
 
+    private final String LECTURER_ID = "L1";
+    private final String LECTURER_NAME = "NameL1";
+    private final String LECTURER_SURNAME = "SurnameL1";
+    private final String STUDENT_ID = "S1";
+    private final String STUDENT_NAME = "NameS1";
+    private final String STUDENT_SURNAME = "SurnameS1";
+    private final Lecturer lecturer = new Lecturer(LECTURER_ID, LECTURER_NAME, LECTURER_SURNAME);
+    private final Student student = new Student(STUDENT_ID, STUDENT_NAME, STUDENT_SURNAME);
+
     @Test
     void addStudent_whenNew() {
-        Lecturer lecturer = new Lecturer("L1", "NameL1", "SurnameL1");
-        when(lecturerRepository.findByLecturerId("L1")).thenReturn(Optional.of(lecturer));
-        when(studentRepository.existsByStudentId("S1")).thenReturn(false);
+        when(lecturerRepository.findByLecturerId(LECTURER_ID)).thenReturn(Optional.of(lecturer));
+        when(studentRepository.existsByStudentId(STUDENT_ID)).thenReturn(false);
 
         StudentResponse response = studentService.addStudentToLecturer(
-                "L1", new CreateStudentRequest("S1", "NameS1", "SurnameS1"));
+                LECTURER_ID, new CreateStudentRequest(STUDENT_ID, STUDENT_NAME, STUDENT_SURNAME));
 
-        assertThat(response.studentId()).isEqualTo("S1");
+        assertThat(response.studentId()).isEqualTo(STUDENT_ID);
         assertThat(response.lecturers()).hasSize(1);
-        assertThat(response.lecturers().getFirst().lecturerId()).isEqualTo("L1");
-        
+        assertThat(response.lecturers().getFirst().lecturerId()).isEqualTo(LECTURER_ID);
+
         verify(studentRepository, never()).save(any(Student.class));
         verify(lecturerRepository).saveAndFlush(lecturer);
     }
 
     @Test
     void addStudent_whenStudentExists() {
-        Lecturer lecturer = new Lecturer("L1", "NameL1", "SurnameL1");
-        Student existing = new Student("S1", "NameS1", "SurnameS1");
-        when(lecturerRepository.findByLecturerId("L1")).thenReturn(Optional.of(lecturer));
-        when(studentRepository.findByStudentId("S1")).thenReturn(Optional.of(existing));
-        when(studentRepository.existsByStudentId("S1")).thenReturn(true);
+        when(lecturerRepository.findByLecturerId(LECTURER_ID)).thenReturn(Optional.of(lecturer));
+        when(studentRepository.findByStudentId(STUDENT_ID)).thenReturn(Optional.of(student));
+        when(studentRepository.existsByStudentId(STUDENT_ID)).thenReturn(true);
 
         StudentResponse response = studentService.addStudentToLecturer(
-                "L1", new CreateStudentRequest("S1", "NameS1", "SurnameS1"));
+                LECTURER_ID, new CreateStudentRequest(STUDENT_ID, STUDENT_NAME, STUDENT_SURNAME));
 
-        assertThat(response.studentId()).isEqualTo("S1");
+        assertThat(response.studentId()).isEqualTo(STUDENT_ID);
         assertThat(response.lecturers()).hasSize(1);
         verify(studentRepository, never()).save(any());
         verify(lecturerRepository).saveAndFlush(lecturer);
@@ -75,7 +84,7 @@ public class StudentServiceTest {
         when(lecturerRepository.findByLecturerId("missing")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> studentService.addStudentToLecturer(
-                "missing", new CreateStudentRequest("S1", "NameS1", "SurnameS1")))
+                "missing", new CreateStudentRequest(STUDENT_ID, STUDENT_NAME, STUDENT_SURNAME)))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(studentRepository, never()).save(any());
@@ -84,12 +93,12 @@ public class StudentServiceTest {
 
     @Test
     void getStudent_returnsResponse() {
-        when(studentRepository.findByStudentId("S1"))
-                .thenReturn(Optional.of(new Student("S1", "NameS1", "SurnameS1")));
+        when(studentRepository.findByStudentId(STUDENT_ID))
+                .thenReturn(Optional.of(student));
 
-        StudentResponse response = studentService.getStudent("S1");
+        StudentResponse response = studentService.getStudent(STUDENT_ID);
 
-        assertThat(response.studentId()).isEqualTo("S1");
+        assertThat(response.studentId()).isEqualTo(STUDENT_ID);
         assertThat(response.lecturers()).isEmpty();
     }
 
@@ -99,5 +108,30 @@ public class StudentServiceTest {
 
         assertThatThrownBy(() -> studentService.getStudent("missing"))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void addStudent_whenExistingStudentDataMismatch_throwsDataMismatch() {
+        when(lecturerRepository.findByLecturerId(LECTURER_ID)).thenReturn(Optional.of(lecturer));
+        when(studentRepository.existsByStudentId(STUDENT_ID)).thenReturn(true);
+        when(studentRepository.findByStudentId(STUDENT_ID)).thenReturn(Optional.of(student));
+
+        assertThatThrownBy(() -> studentService.addStudentToLecturer(
+                LECTURER_ID, new CreateStudentRequest(STUDENT_ID, "differentName", STUDENT_SURNAME)))
+                .isInstanceOf(DataMismatchException.class);
+
+        verify(lecturerRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void addStudent_whenConcurrentDuplicate_translatesToResourceAlreadyExists() {
+        when(lecturerRepository.findByLecturerId(LECTURER_ID)).thenReturn(Optional.of(lecturer));
+        when(studentRepository.existsByStudentId(STUDENT_ID)).thenReturn(false);
+        when(lecturerRepository.saveAndFlush(any(Lecturer.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+        assertThatThrownBy(() -> studentService.addStudentToLecturer(
+                LECTURER_ID, new CreateStudentRequest(STUDENT_ID, STUDENT_NAME, STUDENT_SURNAME))
+        ).isInstanceOf(ResourceAlreadyExistsException.class);
     }
 }

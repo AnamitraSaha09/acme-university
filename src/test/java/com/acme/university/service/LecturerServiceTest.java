@@ -31,28 +31,33 @@ public class LecturerServiceTest {
     @InjectMocks
     private LecturerService lecturerService;
 
+    private final String LECTURER_ID = "L1";
+    private final String LECTURER_NAME = "Name";
+    private final String LECTURER_SURNAME = "Surname";
+    private final Lecturer lecturer = new Lecturer(LECTURER_ID, LECTURER_NAME, LECTURER_SURNAME);
+
     @Test
     void createLecturer_newLecturer() {
-        when(lecturerRepository.existsByLecturerId("L1")).thenReturn(false);
+        when(lecturerRepository.existsByLecturerId(LECTURER_ID)).thenReturn(false);
         when(lecturerRepository.save(any(Lecturer.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         LecturerResponse response = lecturerService.createLecturer(
-                new CreateLecturerRequest("L1", "Name", "Surname"));
+                new CreateLecturerRequest(LECTURER_ID, LECTURER_NAME, LECTURER_SURNAME));
 
-        assertThat(response.lecturerId()).isEqualTo("L1");
-        assertThat(response.name()).isEqualTo("Name");
-        assertThat(response.surname()).isEqualTo("Surname");
+        assertThat(response.lecturerId()).isEqualTo(LECTURER_ID);
+        assertThat(response.name()).isEqualTo(LECTURER_NAME);
+        assertThat(response.surname()).isEqualTo(LECTURER_SURNAME);
         assertThat(response.students()).isEmpty();
         verify(lecturerRepository).save(any(Lecturer.class));
     }
 
     @Test
     void createLecturer_whenAlreadyExists() {
-        when(lecturerRepository.existsByLecturerId("L1")).thenReturn(true);
+        when(lecturerRepository.existsByLecturerId(LECTURER_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> lecturerService.createLecturer(
-                new CreateLecturerRequest("L1", "Name", "Surname")))
+                new CreateLecturerRequest(LECTURER_ID, LECTURER_NAME, LECTURER_SURNAME)))
                 .isInstanceOf(ResourceAlreadyExistsException.class);
 
         verify(lecturerRepository, never()).save(any());
@@ -60,12 +65,12 @@ public class LecturerServiceTest {
 
     @Test
     void getLecturer_returnsResponse() {
-        when(lecturerRepository.findByLecturerId("L1"))
-                .thenReturn(Optional.of(new Lecturer("L1", "Name", "Surname")));
+        when(lecturerRepository.findByLecturerId(LECTURER_ID))
+                .thenReturn(Optional.of(lecturer));
 
-        LecturerResponse response = lecturerService.getLecturer("L1");
+        LecturerResponse response = lecturerService.getLecturer(LECTURER_ID);
 
-        assertThat(response.lecturerId()).isEqualTo("L1");
+        assertThat(response.lecturerId()).isEqualTo(LECTURER_ID);
         assertThat(response.students()).isEmpty();
     }
 
