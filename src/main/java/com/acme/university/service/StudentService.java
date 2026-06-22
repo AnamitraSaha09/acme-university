@@ -49,18 +49,21 @@ public class StudentService {
         {
             log.info("Student found with studentId {}", request.studentId());
             student = studentRepository.findByStudentId(request.studentId()).get();
-            if(!Objects.equals(student.getName(), request.name()) || !Objects.equals(student.getSurname(), request.surname()))
+            if(!Objects.equals(student.getName(), request.name()) || !Objects.equals(student.getSurname(), request.surname())) {
+                log.error("Student name and surname do not match do not match with existing student with studentId {}", request.studentId());
                 throw new DataMismatchException("Student name or surname do not match with the existing student with the same id.");
+            }
         } else {
             log.warn("Student not found, therefore creating Student with studentId {}", request.studentId());
             student = new Student(request.studentId(), request.name(), request.surname());
+            log.info("Creating new student with studentId {}", request.studentId());
         }
         try {
             lecturer.assignUniqueStudent(student);
             lecturerRepository.saveAndFlush(lecturer);
-            log.info("Created student with studentId {}", request.studentId());
-            log.info("Lecturer {} assigned to student {}", lecturer.getLecturerId(), student.getStudentId());
+            log.info("Lecturer {} assigned to student {} persists.", lecturer.getLecturerId(), student.getStudentId());
         } catch (DataIntegrityViolationException e) {
+            log.error("Student with id {} is already assigned to Lecturer with id {}.", request.studentId(), lecturerId);
             throw new ResourceAlreadyExistsException("Student with id " + request.studentId()
                     + " is already assigned to Lecturer with id " + lecturerId);
         }
