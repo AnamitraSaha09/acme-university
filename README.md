@@ -1,4 +1,4 @@
-# ACME University — SWE Cloud/Backend Technical Assignment
+# ACME University
 
 A backend service for a hypothetical educational institute, **ACME University**.
 The domain has two entities — **Lecturer** and **Student** — in a
